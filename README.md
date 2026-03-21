@@ -2,7 +2,7 @@
 
 Misskey 大模型自动回复机器人，通过 WebSocket 实时监听时间线与通知，接入大模型智能回复。
 
-> **By Syskuku_雪音詩絵**
+> **By Syskuku_雪音詩絵 & Xiaomi MiMo V2 Pro**
 > 🌐 www.imikufans.com
 > 📺 [哔哩哔哩](https://space.bilibili.com/473348127)
 > 💻 [GitHub](https://github.com/syskuku/)
@@ -361,4 +361,4 @@ MIT License
 
 ---
 
-**By Syskuku_雪音詩絵** · [www.imikufans.com](https://www.imikufans.com)
+**By Syskuku_雪音詩絵 & Xiaomi MiMo V2 Pro** · [www.imikufans.com](https://www.imikufans.com)
