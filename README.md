@@ -6,6 +6,8 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen)](https://nodejs.org)
 
 > **一行部署，给你的 Misskey 实例加上 AI 小伙伴。**
+>
+> 🌐 **在线体验：[hub.imikufans.com](https://hub.imikufans.com)** — 去 @subot 打个招呼吧！
 
 通过 WebSocket 实时监听时间线与通知，接入大模型智能回复。支持 NVIDIA NIM / OpenAI / DeepSeek / Ollama 等所有 OpenAI 兼容接口。
 
