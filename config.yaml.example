@@ -1,0 +1,100 @@
+# ═══════════════════════════════════════════════════════════
+#  Misskey-LLM-Bot  配置文件
+#  编辑后运行: npm start
+# ═══════════════════════════════════════════════════════════
+#  By Syskuku_雪音詩絵  |  www.imikufans.com
+# ═══════════════════════════════════════════════════════════
+
+# ──── Misskey 实例 ────
+misskey:
+  # 你的 Misskey 实例地址（https）
+  host: "https://misskey.example.com"
+  # API 访问令牌
+  # 在 Misskey 设置 → API → 生成令牌，需要以下权限：
+  #   - read:account
+  #   - write:notes
+  #   - read:notifications
+  token: "your_access_token_here"
+
+# ──── 大模型配置（OpenAI 兼容格式）───
+llm:
+  # API 基础地址，兼容任何 OpenAI 格式接口
+  # 默认：NVIDIA NIM
+  base_url: "https://integrate.api.nvidia.com/v1"
+  # API Key
+  api_key: "your_api_key_here"
+  # 模型名称（可随时切换）
+  model: "minimaxai/minimax-m2.1"
+  # 最大生成 token 数
+  max_tokens: 512
+  # 温度（0~2，越高越随机）
+  temperature: 0.8
+  # 自定义系统提示词（留空则使用下方 persona 自动拼装）
+  system_prompt: ""
+
+# ──── 机器人行为 ────
+bot:
+  # 机器人的用户名（不含 @，部署后会自动检测，这里仅作备用）
+  username: ""
+  # 回复模式：
+  #   mention — 只回复 @机器人的消息（默认）
+  #   all     — 也监听时间线，按概率随机回复
+  reply_mode: "mention"
+  # all 模式：免@回复概率（0~1）
+  all_reply_probability: 0.2
+  # 间隔回复：收到消息后等待几秒再回复（避免秒回）
+  reply_interval: 3
+  # 间隔 N 条时间线帖子回复一次（0 = 不间隔）
+  skip_notes: 0
+  # 冷却时间（秒），同一用户冷却期内不重复回复
+  cooldown_seconds: 10
+  # 最大回复字数
+  max_reply_length: 150
+  # MFM 特效触发概率（0~1）
+  mfm_chance: 0.3
+  # 定时问候开关
+  auto_greeting: true
+  # 定时问候时间点（24h，±2分钟匹配）
+  greeting_chances:
+    - "09:00"
+    - "12:00"
+    - "18:00"
+    - "22:00"
+  # 监听的频道
+  enable_local_timeline: true
+  enable_global_timeline: true
+  enable_notifications: true
+  # 日志级别: debug / info / warn / error
+  log_level: "info"
+
+# ──── 人格设定 ────
+persona:
+  name: "雪音酱"
+  description: "SYSKUKU 的宠物女孩，很可爱又有点害羞"
+  style: "回复简洁有趣，控制在150字以内，偶尔使用emoji，语气软萌但有主见"
+
+
+# ═══════════════════════════════════════════
+#  切换模型示例
+# ═══════════════════════════════════════════
+#
+#  NVIDIA NIM 其他模型：
+#    model: "meta/llama-3.1-405b-instruct"
+#    model: "meta/llama-3.1-70b-instruct"
+#
+#  OpenAI 官方：
+#    base_url: "https://api.openai.com/v1"
+#    api_key: "sk-..."
+#    model: "gpt-4o-mini"
+#
+#  DeepSeek：
+#    base_url: "https://api.deepseek.com/v1"
+#    api_key: "sk-..."
+#    model: "deepseek-chat"
+#
+#  本地 Ollama：
+#    base_url: "http://localhost:11434/v1"
+#    api_key: "ollama"
+#    model: "qwen2.5:7b"
+#
+#  只要是 OpenAI 兼容格式的 API 都支持

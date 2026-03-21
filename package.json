@@ -1,0 +1,17 @@
+{
+  "name": "misskey-llm-bot",
+  "version": "1.0.0",
+  "description": "Misskey 大模型自动回复机器人 — By Syskuku_雪音詩絵",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "Syskuku_雪音詩絵 <www.imikufans.com>",
+  "license": "MIT"
+}

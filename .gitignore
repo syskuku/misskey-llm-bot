@@ -1,0 +1,4 @@
+node_modules/
+config.yaml
+*.log
+.DS_Store

@@ -1,0 +1,26 @@
+[Unit]
+Description=Misskey-LLM-Bot (By Syskuku)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=misskey-bot
+Group=misskey-bot
+WorkingDirectory=/opt/misskey-llm-bot
+ExecStart=/usr/bin/node /opt/misskey-llm-bot/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=misskey-llm-bot
+
+# 安全加固
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/misskey-llm-bot
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
