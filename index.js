@@ -79,12 +79,28 @@ function parseYaml(text) {
     if (am) {
       while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
       const parent = stack[stack.length - 1].obj;
-      // 找父级中最后一个数组
-      const keys = Object.keys(parent);
-      for (let i = keys.length - 1; i >= 0; i--) {
-        if (Array.isArray(parent[keys[i]])) {
-          parent[keys[i]].push(coerce(am[1]));
-          break;
+      // 找父级中最后一个数组；如果 parent 本身是空对象，先转成数组
+      if (typeof parent === 'object' && !Array.isArray(parent) && Object.keys(parent).length === 0) {
+        // 这个 parent 是上一层某个 key 的占位空对象，需要找到它在 grandparent 中的 key 并替换为数组
+        const grand = stack[stack.length - 2].obj;
+        for (const k of Object.keys(grand)) {
+          if (grand[k] === parent) {
+            grand[k] = [];
+            stack[stack.length - 1].obj = grand[k];
+            break;
+          }
+        }
+      }
+      const target = stack[stack.length - 1].obj;
+      if (Array.isArray(target)) {
+        target.push(coerce(am[1]));
+      } else {
+        const keys = Object.keys(target);
+        for (let i = keys.length - 1; i >= 0; i--) {
+          if (Array.isArray(target[keys[i]])) {
+            target[keys[i]].push(coerce(am[1]));
+            break;
+          }
         }
       }
       continue;
@@ -153,7 +169,7 @@ function loadConfig() {
 // ═══════════════════════════════════════════
 //  HTTP 请求
 // ═══════════════════════════════════════════
-function request(url, opts = {}) {
+function request(url, opts = {}, retries = 3) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const lib = u.protocol === 'https:' ? https : http;
@@ -163,6 +179,7 @@ function request(url, opts = {}) {
       path: u.pathname + u.search,
       method: opts.method || 'GET',
       headers: { 'Content-Type': 'application/json', ...opts.headers },
+      timeout: 15000,
     }, res => {
       let d = '';
       res.on('data', c => d += c);
@@ -172,7 +189,16 @@ function request(url, opts = {}) {
         resolve({ status: res.statusCode, data: parsed });
       });
     });
-    req.on('error', reject);
+    req.on('error', async e => {
+      if (retries > 0) {
+        log('warn', `请求失败 ${u.pathname}, 重试中... (${retries}次剩余)`, e.message);
+        await new Promise(r => setTimeout(r, 2000));
+        try { resolve(await request(url, opts, retries - 1)); } catch(err) { reject(err); }
+      } else {
+        reject(e);
+      }
+    });
+    req.on('timeout', () => { req.destroy(); });
     if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
     req.end();
   });
@@ -289,6 +315,8 @@ class Bot {
     this._cid = 0;        // channel id 计数器
     this._chan = {};       // channelName → wsId
     this._timelineN = 0;  // 时间线帖子计数
+    this._seen = new Set();    // 已处理消息去重
+    this._pollTimers = [];     // 轮询定时器
   }
 
   // ──── 构造 LLM 消息 ────
@@ -337,6 +365,10 @@ class Bot {
 
   // ──── 时间线帖子 → all 模式概率回复 ────
   async onTimeline(note) {
+    const key = `tl_${note.id}`;
+    if (this._seen.has(key)) return;
+    this._seen.add(key);
+
     if (this.mode !== 'all') return;
     const u = note.user || {};
     if (!u.username) return;
@@ -357,6 +389,10 @@ class Bot {
 
   // ──── 通知处理 ────
   async handleNotif(n) {
+    const key = `notif_${n.id}`;
+    if (this._seen.has(key)) return;
+    this._seen.add(key);
+
     const t = n.type;
     log('debug', `通知 type=${t}`, JSON.stringify(n).slice(0, 200));
 
@@ -373,6 +409,8 @@ class Bot {
   async onRaw(raw) {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
+
+    log('debug', 'WS RAW:', raw.slice(0, 300));
 
     // 心跳
     if (msg.type === 'connected') { log('debug', 'WS connected'); return; }
@@ -449,7 +487,10 @@ class Bot {
     log('info', `   通知=${this.cfg.bot.enable_notifications}  本地=${this.cfg.bot.enable_local_timeline}  全局=${this.cfg.bot.enable_global_timeline}`);
 
     this.greetingLoop();
+    this.startPolling();
     setInterval(() => this.cd.clean(), 60_000);
+    // 防止 _seen 无限增长，每5分钟清一次
+    setInterval(() => { if (this._seen.size > 1000) this._seen.clear(); }, 300_000);
 
     while (this._on) {
       try { await this._connect(); } catch (e) { log('error', 'WS:', e.message); }
@@ -463,7 +504,11 @@ class Bot {
       const url = `${host}/streaming?i=${encodeURIComponent(this.cfg.misskey.token)}`;
       log('info', '🔌 连接 WebSocket...');
 
-      this._ws = new WebSocket(url);
+      this._ws = new WebSocket(url, {
+        perMessageDeflate: false,
+        handshakeTimeout: 15000,
+        headers: { 'Origin': this.cfg.misskey.host.replace(/\/+$/, '') }
+      });
       this._ws.on('open', () => {
         log('info', '🟢 WebSocket 已连接');
         if (this.cfg.bot.enable_notifications)    this.sub('main');
@@ -476,7 +521,53 @@ class Bot {
     });
   }
 
-  async shutdown() { this._on = false; if (this._ws) this._ws.close(); }
+  // ──── HTTP 轮询兜底（WebSocket 不可靠时用）───
+  async pollNotifications() {
+    try {
+      const notifs = await this.api.post('i/notifications', { limit: 10 });
+      if (!Array.isArray(notifs)) return;
+      for (const n of notifs) {
+        if (!['mention', 'reply', 'message'].includes(n.type)) continue;
+        await this.handleNotif(n);
+      }
+    } catch (e) { log('warn', '轮询通知失败:', e.message); }
+  }
+
+  async pollLocalTimeline() {
+    try {
+      const notes = await this.api.post('notes/local-timeline', { limit: 10 });
+      if (!Array.isArray(notes)) return;
+      for (const note of notes) {
+        await this.onTimeline(note);
+      }
+    } catch (e) { log('warn', '轮询本地TL失败:', e.message); }
+  }
+
+  async pollGlobalTimeline() {
+    try {
+      const notes = await this.api.post('notes/global-timeline', { limit: 10 });
+      if (!Array.isArray(notes)) return;
+      for (const note of notes) {
+        await this.onTimeline(note);
+      }
+    } catch (e) { log('warn', '轮询全局TL失败:', e.message); }
+  }
+
+  startPolling() {
+    const interval = 15000; // 15秒轮询一次
+    log('info', '🔄 启动 HTTP 轮询 (每15秒)');
+    if (this.cfg.bot.enable_notifications) {
+      this._pollTimers.push(setInterval(() => this.pollNotifications(), interval));
+    }
+    if (this.cfg.bot.enable_local_timeline) {
+      this._pollTimers.push(setInterval(() => this.pollLocalTimeline(), interval));
+    }
+    if (this.cfg.bot.enable_global_timeline) {
+      this._pollTimers.push(setInterval(() => this.pollGlobalTimeline(), interval));
+    }
+  }
+
+  async shutdown() { this._on = false; if (this._ws) this._ws.close(); this._pollTimers.forEach(t => clearInterval(t)); }
   sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 }
 
