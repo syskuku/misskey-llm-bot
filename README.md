@@ -5,6 +5,8 @@
 [![License](https://img.shields.io/github/license/syskuku/misskey-llm-bot)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen)](https://nodejs.org)
 
+**简体中文** | **[繁體中文](README_zh-TW.md)** | **[日本語](README_ja.md)** | **[English](README_en.md)**
+
 > **一行部署，给你的 Misskey 实例加上 AI 小伙伴。**
 >
 > 🌐 **在线体验：[hub.imikufans.com](https://hub.imikufans.com)** — 去 @subot 打个招呼吧！
